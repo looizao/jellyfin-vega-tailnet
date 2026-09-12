@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish VPKG
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: 1.25.5
+          cache-dependency-path: third_party/libtailscale/go.sum
+
+      - name: Install build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y curl jq lz4 python3-dev
+
+      - name: Install pinned Vega SDK
+        run: |
+          bash scripts/install-vega-sdk.sh
+          echo "$HOME/vega/bin" >> "$GITHUB_PATH"
+
+      - name: Install and verify
+        run: |
+          npm ci --ignore-scripts
+          npm run verify
+
+      - name: Build release package
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          source "$HOME/vega/env"
+          export BUILD_VERSION="${RELEASE_TAG#v}"
+          npm run build:release
+
+      - name: Stage and validate artifacts
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          source "$HOME/vega/env"
+          mkdir -p dist
+          vpkg="$(find build/armv7-release -name '*.vpkg' -type f -print -quit)"
+          test -n "$vpkg"
+          output="dist/TailVega-${RELEASE_TAG#v}-armv7.vpkg"
+          cp "$vpkg" "$output"
+          vega exec vpt validate "$output"
+          sha256sum "$output" > "$output.sha256"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: gh release create "$RELEASE_TAG" dist/* --generate-notes --title "TailVega $RELEASE_TAG"

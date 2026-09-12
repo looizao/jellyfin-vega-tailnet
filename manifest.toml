@@ -1,0 +1,14 @@
+schema-version = 1
+
+[package]
+title = "TailVega"
+version = "0.1.0"
+id = "com.looizao.tailvega"
+icon = "@image/tailvega-icon.png"
+
+[components]
+[[components.interactive]]
+id = "com.looizao.tailvega.main"
+runtime-module = "/com.amazon.kepler.keplerscript.runtime.loader_2@IKeplerScript_2_0"
+launch-type = "singleton"
+categories = ["com.amazon.category.main"]

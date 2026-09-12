@@ -1,0 +1,17 @@
+node_modules/
+build/
+dist/
+bvm/
+.cache/
+.tools/
+.git-workspace/
+native/prebuilt/
+assets/image/tailvega-icon-source.png
+*.log
+*.vpkg
+CMakeUserPresets.json
+buildinfo.json
+coverage/
+.DS_Store
+.idea/
+.vscode/settings.json

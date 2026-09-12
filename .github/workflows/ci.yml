@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality and native smoke test
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: 1.25.5
+          cache-dependency-path: third_party/libtailscale/go.sum
+
+      - name: Install JavaScript dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run checks
+        run: npm run verify
+
+  vpkg:
+    name: Build ARMv7 VPKG
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    needs: quality
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: 1.25.5
+          cache-dependency-path: third_party/libtailscale/go.sum
+
+      - name: Install build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y curl jq lz4 python3-dev
+
+      - name: Install pinned Vega SDK
+        run: |
+          bash scripts/install-vega-sdk.sh
+          echo "$HOME/vega/bin" >> "$GITHUB_PATH"
+
+      - name: Install JavaScript dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build release package
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          source "$HOME/vega/env"
+          npm run build:release
+
+      - name: Validate package
+        run: |
+          source "$HOME/vega/env"
+          vpkg="$(find build/armv7-release -name '*.vpkg' -type f -print -quit)"
+          test -n "$vpkg"
+          vega exec vpt validate "$vpkg"
+          vega exec vpt info "$vpkg" --json
+
+      - name: Upload ARMv7 package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tailvega-armv7-${{ github.sha }}
+          path: build/armv7-release/*.vpkg
+          if-no-files-found: error
+          retention-days: 14
