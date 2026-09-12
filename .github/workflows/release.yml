@@ -68,10 +68,11 @@ jobs:
           mkdir -p dist
           vpkg="$(find build/armv7-release -name '*.vpkg' -type f -print -quit)"
           test -n "$vpkg"
-          output="dist/TailVega-${RELEASE_TAG#v}-armv7.vpkg"
+          filename="TailVega-${RELEASE_TAG#v}-armv7.vpkg"
+          output="dist/$filename"
           cp "$vpkg" "$output"
           vega exec vpt validate "$output"
-          sha256sum "$output" > "$output.sha256"
+          (cd dist && sha256sum "$filename" > "$filename.sha256")
 
       - name: Publish GitHub release
         env:
