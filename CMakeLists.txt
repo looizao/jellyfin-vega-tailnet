@@ -33,7 +33,15 @@ file(GLOB TAILSCALE_BINDING_SOURCES CONFIGURE_DEPENDS
   "${TAILSCALE_SOURCE_DIR}/*.h"
 )
 
-set(TAILVEGA_CGO_FLAGS "--sysroot=${CMAKE_SYSROOT} ${CMAKE_C_FLAGS}")
+set(TAILVEGA_CGO_ISA_FLAG "")
+if(TAILVEGA_GOARCH STREQUAL "arm")
+  # cgo's ARM assembly bridge cannot be compiled as Thumb code.
+  set(TAILVEGA_CGO_ISA_FLAG "-marm")
+endif()
+
+set(TAILVEGA_CGO_FLAGS
+  "--sysroot=${CMAKE_SYSROOT} ${CMAKE_C_FLAGS} ${TAILVEGA_CGO_ISA_FLAG}"
+)
 set(TAILVEGA_CGO_LDFLAGS "--sysroot=${CMAKE_SYSROOT} ${CMAKE_EXE_LINKER_FLAGS}")
 
 add_custom_command(
@@ -49,7 +57,7 @@ add_custom_command(
     "CGO_LDFLAGS=${TAILVEGA_CGO_LDFLAGS}"
     "GOCACHE=${CMAKE_CURRENT_BINARY_DIR}/go-build-cache"
     "GOMODCACHE=${CMAKE_CURRENT_BINARY_DIR}/go-module-cache"
-    "${GO_EXECUTABLE}" build -trimpath -buildmode=c-archive
+    "${GO_EXECUTABLE}" build -trimpath -buildmode=c-archive -ldflags=-buildid=
       -o "${TAILSCALE_ARCHIVE}" .
   WORKING_DIRECTORY "${TAILSCALE_SOURCE_DIR}"
   DEPENDS ${TAILSCALE_BINDING_SOURCES}

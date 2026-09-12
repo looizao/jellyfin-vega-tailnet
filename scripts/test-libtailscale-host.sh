@@ -13,6 +13,17 @@ if [[ ! -f "$archive" ]]; then
   exit 1
 fi
 
+if ! command -v readelf >/dev/null; then
+  echo "readelf is required for the native archive test" >&2
+  exit 1
+fi
+
+if readelf -n "$archive" 2>/dev/null | awk \
+  '/\.note\.go\.buildid/ { found = 1 } END { exit !found }'; then
+  echo "libtailscale archive must not contain a Go build ID note" >&2
+  exit 1
+fi
+
 mkdir -p "$project_root/.cache/native-tests"
 cc -O2 \
   -I"$project_root/third_party/libtailscale" \

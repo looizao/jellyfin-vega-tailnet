@@ -36,7 +36,7 @@ env \
   CGO_ENABLED=1 \
   GOCACHE="$project_root/.cache/go-build" \
   GOMODCACHE="$project_root/.cache/go-mod" \
-  "$go_binary" build -trimpath -buildmode=c-archive \
+  "$go_binary" build -trimpath -buildmode=c-archive -ldflags=-buildid= \
     -o "$output_dir/libtailscale.a" .
 
 echo "Built $output_dir/libtailscale.a"
