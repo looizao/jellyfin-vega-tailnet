@@ -52,7 +52,7 @@
     "targets": [
       "tv"
     ],
-    "features": [
+    "os": [
       "vega"
     ],
     "api": 0.1
