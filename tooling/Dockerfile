@@ -1,4 +1,4 @@
-FROM node:22.22.0-bookworm-slim AS node
+FROM node:26.8-bookworm-slim AS node
 FROM golang:1.26.8-bookworm AS go
 FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
