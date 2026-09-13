@@ -16,12 +16,12 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22.22.0
           cache: npm
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: 1.26.8
           cache-dependency-path: native/go.sum
@@ -40,19 +40,19 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22.22.0
           cache: npm
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: 1.26.8
           cache-dependency-path: native/go.sum
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: browser-evidence-${{ github.sha }}
@@ -66,30 +66,16 @@ jobs:
     timeout-minutes: 45
     needs: [quality, browser]
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
-        with:
-          node-version: 22.22.0
-          cache: npm
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version: 1.26.8
-          cache-dependency-path: native/go.sum
-      - name: Install build prerequisites and pinned SDK
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl jq lz4 python3-dev
-          bash scripts/install-vega-sdk.sh
-          echo "$HOME/vega/bin" >> "$GITHUB_PATH"
-      - run: npm ci --ignore-scripts
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build the actual Docker SDK builder
+        run: docker build -f tooling/Dockerfile -t jellyvega-builder:ci .
       - name: Build and stage validated release artifacts
         env:
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
-          source "$HOME/vega/env"
-          npm run build:release
-          bash scripts/stage-release.sh
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+          docker run --rm -e BUILD_NUMBER -v "$PWD:/work" jellyvega-builder:ci \
+            bash -c 'source /root/vega/env && npm ci --ignore-scripts && npm run build:release && bash scripts/stage-release.sh'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: jellyvega-armv7-${{ github.sha }}
           path: dist/*

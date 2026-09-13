@@ -32,7 +32,7 @@ Use the directional pad and Select in Jellyfin. Back returns through Jellyfin's 
 
 ## Build and test
 
-Pinned toolchain: Vega SDK **0.22.5850**, Node **22.22.0**, Go **1.26.8**, React Native **0.72**, WebView **3.3.1769932800**, Tailscale **1.102.4**.
+Pinned toolchain: Vega SDK **0.22.5850**, Node **22.22.0**, Go **1.26.8**, React Native **0.72**, WebView **3.5.11**, Tailscale **1.102.4**.
 
 ```sh
 npm ci --ignore-scripts

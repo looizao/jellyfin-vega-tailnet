@@ -5,18 +5,42 @@ updates:
     schedule: {interval: weekly}
     open-pull-requests-limit: 5
     groups:
-      compatible-tooling: {patterns: ['@types/*', '@playwright/*', 'prettier']}
+      jest-tooling:
+        patterns: ['jest', '@types/jest', 'ts-jest', 'babel-jest']
+        update-types: [minor, patch]
+      compatible-tooling:
+        patterns: ['@types/*', '@playwright/*', 'prettier']
+        update-types: [minor, patch]
     ignore:
       - dependency-name: '@amazon-devices/*'
         update-types: ['version-update:semver-major']
       - dependency-name: react-native
         update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      # These belong to the SDK's compiler/runtime or the pinned host toolchain.
+      - dependency-name: '@babel/runtime'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@react-native-community/cli'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+      - dependency-name: prettier
+        update-types: ['version-update:semver-major']
   - package-ecosystem: gomod
     directory: /native
     schedule: {interval: weekly}
   - package-ecosystem: github-actions
     directory: /
     schedule: {interval: weekly}
+    groups:
+      actions: {patterns: ['*']}
   - package-ecosystem: docker
     directory: /tooling
     schedule: {interval: monthly}
+    ignore:
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
+      - dependency-name: golang
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      # Keep the SDK's validated host; security fixes arrive in the 22.04 image.
+      - dependency-name: ubuntu
+        versions: ['*']
