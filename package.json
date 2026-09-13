@@ -28,7 +28,7 @@
     "@amazon-devices/keplerscript-turbomodule-api": "1.2.5",
     "@amazon-devices/react-native-kepler": "2.1.0",
     "@amazon-devices/webview": "3.3.1769932800",
-    "@babel/runtime": "7.28.4",
+    "@babel/runtime": "8.0.0",
     "qrcode-generator": "2.0.4",
     "react": "18.2.0",
     "react-native": "0.72.0"
