@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.19)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-project(tailvega VERSION 0.1.0 LANGUAGES C CXX)
+project(jellyvega VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -10,60 +10,61 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(turbomoduleAPI CONFIG REQUIRED)
 find_program(GO_EXECUTABLE NAMES go REQUIRED)
 
-string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" TAILVEGA_PROCESSOR)
-if(TAILVEGA_PROCESSOR MATCHES "^(arm|armv7|armv7l)$")
-  set(TAILVEGA_GOARCH arm)
-  set(TAILVEGA_GOARM 7)
-elseif(TAILVEGA_PROCESSOR MATCHES "^(aarch64|arm64)$")
-  set(TAILVEGA_GOARCH arm64)
-  set(TAILVEGA_GOARM "")
-elseif(TAILVEGA_PROCESSOR MATCHES "^(x86_64|amd64)$")
-  set(TAILVEGA_GOARCH amd64)
-  set(TAILVEGA_GOARM "")
+string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" JELLYVEGA_PROCESSOR)
+if(JELLYVEGA_PROCESSOR MATCHES "^(arm|armv7|armv7l)$")
+  set(JELLYVEGA_GOARCH arm)
+  set(JELLYVEGA_GOARM 7)
+elseif(JELLYVEGA_PROCESSOR MATCHES "^(aarch64|arm64)$")
+  set(JELLYVEGA_GOARCH arm64)
+  set(JELLYVEGA_GOARM "")
+elseif(JELLYVEGA_PROCESSOR MATCHES "^(x86_64|amd64)$")
+  set(JELLYVEGA_GOARCH amd64)
+  set(JELLYVEGA_GOARM "")
 else()
   message(FATAL_ERROR "Unsupported Vega target processor: ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
-set(TAILSCALE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/libtailscale")
-set(TAILSCALE_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/libtailscale-${TAILVEGA_GOARCH}")
+set(TAILSCALE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/native")
+set(TAILSCALE_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/libtailscale-${JELLYVEGA_GOARCH}")
 set(TAILSCALE_ARCHIVE "${TAILSCALE_BUILD_DIR}/libtailscale.a")
-file(GLOB TAILSCALE_BINDING_SOURCES CONFIGURE_DEPENDS
-  "${TAILSCALE_SOURCE_DIR}/*.go"
+file(GLOB_RECURSE TAILSCALE_BINDING_SOURCES CONFIGURE_DEPENDS
+  "${TAILSCALE_SOURCE_DIR}/*/*.go"
   "${TAILSCALE_SOURCE_DIR}/*.c"
   "${TAILSCALE_SOURCE_DIR}/*.h"
 )
 
-set(TAILVEGA_CGO_ISA_FLAG "")
-if(TAILVEGA_GOARCH STREQUAL "arm")
+set(JELLYVEGA_CGO_ISA_FLAG "")
+if(JELLYVEGA_GOARCH STREQUAL "arm")
   # cgo's ARM assembly bridge cannot be compiled as Thumb code.
-  set(TAILVEGA_CGO_ISA_FLAG "-marm")
+  set(JELLYVEGA_CGO_ISA_FLAG "-marm")
 endif()
 
-set(TAILVEGA_CGO_FLAGS
-  "--sysroot=${CMAKE_SYSROOT} ${CMAKE_C_FLAGS} ${TAILVEGA_CGO_ISA_FLAG}"
+set(JELLYVEGA_CGO_FLAGS
+  "--sysroot=${CMAKE_SYSROOT} ${CMAKE_C_FLAGS} ${JELLYVEGA_CGO_ISA_FLAG}"
 )
-set(TAILVEGA_CGO_LDFLAGS "--sysroot=${CMAKE_SYSROOT} ${CMAKE_EXE_LINKER_FLAGS}")
+set(JELLYVEGA_CGO_LDFLAGS "--sysroot=${CMAKE_SYSROOT} ${CMAKE_EXE_LINKER_FLAGS}")
 
 add_custom_command(
   OUTPUT "${TAILSCALE_ARCHIVE}"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${TAILSCALE_BUILD_DIR}"
   COMMAND "${CMAKE_COMMAND}" -E env
     "GOOS=linux"
-    "GOARCH=${TAILVEGA_GOARCH}"
-    "GOARM=${TAILVEGA_GOARM}"
+    "GOARCH=${JELLYVEGA_GOARCH}"
+    "GOARM=${JELLYVEGA_GOARM}"
     "CGO_ENABLED=1"
     "CC=${CMAKE_C_COMPILER}"
-    "CGO_CFLAGS=${TAILVEGA_CGO_FLAGS}"
-    "CGO_LDFLAGS=${TAILVEGA_CGO_LDFLAGS}"
+    "CGO_CFLAGS=${JELLYVEGA_CGO_FLAGS}"
+    "CGO_LDFLAGS=${JELLYVEGA_CGO_LDFLAGS}"
     "GOCACHE=${CMAKE_CURRENT_BINARY_DIR}/go-build-cache"
     "GOMODCACHE=${CMAKE_CURRENT_BINARY_DIR}/go-module-cache"
-    "${GO_EXECUTABLE}" build -trimpath -buildmode=c-archive -ldflags=-buildid=
-      -o "${TAILSCALE_ARCHIVE}" .
+    "${GO_EXECUTABLE}" build -buildvcs=false -trimpath -buildmode=c-archive -ldflags=-buildid=
+      -o "${TAILSCALE_ARCHIVE}" ./bridge
   WORKING_DIRECTORY "${TAILSCALE_SOURCE_DIR}"
   DEPENDS ${TAILSCALE_BINDING_SOURCES}
+          "${TAILSCALE_SOURCE_DIR}/gateway/adapter.js"
           "${TAILSCALE_SOURCE_DIR}/go.mod"
           "${TAILSCALE_SOURCE_DIR}/go.sum"
-  COMMENT "Building libtailscale for Vega ${TAILVEGA_GOARCH}"
+  COMMENT "Building libtailscale for Vega ${JELLYVEGA_GOARCH}"
   VERBATIM
 )
 
@@ -72,18 +73,19 @@ add_library(libtailscale STATIC IMPORTED GLOBAL)
 set_target_properties(libtailscale PROPERTIES IMPORTED_LOCATION "${TAILSCALE_ARCHIVE}")
 add_dependencies(libtailscale libtailscale_build)
 
-set(TAILVEGA_SOURCES
+set(JELLYVEGA_SOURCES
   kepler/AutoLinkInit.cpp
   kepler/turbo-modules/generated/TailscaleSpec.cpp
   kepler/turbo-modules/Tailscale.cpp
 )
 
-kepler_add_turbo_module_library(tailvega ${TAILVEGA_SOURCES})
-add_dependencies(tailvega libtailscale_build)
-target_include_directories(tailvega PRIVATE
+kepler_add_turbo_module_library(jellyvega ${JELLYVEGA_SOURCES})
+add_dependencies(jellyvega libtailscale_build)
+target_include_directories(jellyvega PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/kepler/turbo-modules"
-  "${TAILSCALE_SOURCE_DIR}"
+  "${TAILSCALE_BUILD_DIR}"
 )
-target_link_libraries(tailvega PRIVATE libtailscale pthread dl m)
+target_link_libraries(jellyvega PRIVATE libtailscale pthread dl m)
 
-install(TARGETS tailvega)
+install(TARGETS jellyvega)
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets/licenses/" DESTINATION assets/licenses)

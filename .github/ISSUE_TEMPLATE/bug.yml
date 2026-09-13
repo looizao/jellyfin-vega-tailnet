@@ -1,0 +1,17 @@
+name: Bug report
+description: Report a reproducible JellyVega issue
+body:
+  - type: textarea
+    attributes:
+      label: Device and versions
+      description: Fire TV model, Vega OS build, JellyVega version, Jellyfin version.
+    validations: {required: true}
+  - type: textarea
+    attributes:
+      label: Reproduction and expected result
+      description: Include remote actions and media codecs when relevant.
+    validations: {required: true}
+  - type: textarea
+    attributes:
+      label: Redacted evidence
+      description: Never include auth keys, passwords, node-state files, or session tokens.

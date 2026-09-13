@@ -1,51 +1,33 @@
-# Architecture and limitations
+# Architecture
 
-TailVega is an application-scoped userspace Tailscale node. It does not attempt to replace a system VPN service.
-
-## Components
-
-1. The React Native TV interface accepts the initial auth key, shows sanitized status, and invokes native operations.
-2. A Kepler Turbo Module implements asynchronous `connect`, `status`, `disconnect`, and TCP `probe` methods in C++.
-3. The module links a Go `c-archive` produced from the official `tailscale/libtailscale` C API.
-4. `libtailscale` runs `tsnet`, stores node state in the app's private data directory, and connects directly to the Tailscale control and data planes.
-
-The build cross-compiles Go with the Vega ARMv7 compiler and sysroot selected by CMake. No prebuilt native archive is committed or trusted by the release workflow.
-
-## Data flow
-
-```text
-Auth key -> secure React Native input -> Turbo Module -> tsnet configuration
-                                                |
-                                                +-> private tailscaled.state
-                                                +-> tailnet control/data traffic
-
-Status JSON <- Turbo Module <- in-memory libtailscale LocalAPI
-
-TCP destination -> Turbo Module -> tailscale_dial -> tailnet peer
+```mermaid
+flowchart LR
+  Remote[Fire TV remote] --> UI[React Native setup / Vega WebView]
+  UI --> Gateway[Authenticated loopback gateway]
+  Gateway --> TS[Embedded Tailscale tsnet]
+  TS --> NAS[Home tailnet peer]
+  NAS --> Jellyfin[Jellyfin server and Web client]
 ```
 
-The JavaScript auth-key state is cleared after `connect` returns. The C++ input buffer is overwritten after the key has been passed to `libtailscale`. Engine logs are disabled to reduce accidental credential or tailnet metadata exposure. Vega OS still controls process memory and private application storage.
+The C++ Turbo Module exposes asynchronous start, status, stop, and connectivity-check methods. A Go C archive owns a `tsnet.Server`, node identity, and one reverse proxy. It is linked into the Vega native module and packaged with the React Native app. No separately installed daemon is needed. Native work runs away from the JavaScript thread; the last native worker releases the engine owner and closes its streams.
 
-## Why this is not a full VPN
+The gateway listens on `127.0.0.1:18765`. Its only upstream is the configured Jellyfin origin/base path. A 256-bit random bootstrap credential sets an HttpOnly, SameSite session cookie before entering `/web/index.html`; the token is never sent to Jellyfin. Cookie authentication covers API requests, media, and WebSocket upgrades. Host/Origin validation, a restrictive content security policy, and native navigation checks prevent requests from moving outside that route.
 
-A normal Tailscale client creates or integrates with a system network interface and asks the operating system to route device traffic through it. Public Vega APIs do not currently provide third-party applications with the required VPN or TUN integration. An app-scoped `tsnet` server therefore cannot intercept traffic from unrelated Fire TV applications.
+All outgoing dials resolve a numeric Tailscale address or match a peer in Tailscale's authenticated network map. The gateway then calls `tsnet.Dial` with a Tailscale IP. It does not fall back to public DNS, a LAN socket, or an environment HTTP proxy. TLS certificate validation still uses the original server hostname. The Tailscale ACL/grant layer remains authoritative.
 
-Consequences:
+Standard HTTP reverse proxying preserves Range/206 streaming, HLS requests, POST bodies, authorization, and WebSocket upgrades. Connections stream without buffering whole movies. Connection/header timeouts bound failures; streaming bodies have no fixed overall timeout. Shutdown explicitly closes upgraded connections as well as ordinary HTTP streams. Absolute same-server redirects become local redirects; external redirects are refused. Jellyfin plugins/assets that require third-party origins are blocked.
 
-- TailVega does not route streaming applications or the Fire TV browser through a tailnet.
-- It cannot use a Tailscale exit node for device-wide internet traffic.
-- It cannot advertise the Fire TV as a subnet router or exit node.
-- Tailnet access must be performed by TailVega itself or by software explicitly configured for its SOCKS5 endpoint.
-- Vega may suspend or terminate the app in the background, interrupting connectivity until it is launched again.
+The matching Web client comes from the configured server. Only its HTML entry page is buffered (maximum 4 MiB) to insert a small adapter before application scripts. The adapter selects Jellyfin's TV layout and maps Menu to native settings. Server changes clear browser storage before Jellyfin runs, preventing credentials from the previous server being reused. The stable local origin preserves sign-in on ordinary reconnects. Service-worker installation is disabled so a cached web application cannot bypass that server-change boundary.
 
-If Amazon publishes a supported VPN or TUN API, a future version can add a platform network backend while preserving much of the current UI and build pipeline.
+Private native data is in `/home/app_user/packages/com.looizao.jellyvega/data/`. `settings.json` stores only server URL and node name with mode 0600. Tailscale's own state store persists device identity. Enrollment keys remain memory-only inputs. The operating system controls WebView storage and app process lifetime. A killed process reconnects on the next launch; background playback and continuous operation while other apps run are not promised.
 
-## Lifecycle
+## Source map
 
-On first connection, TailVega initializes `tsnet`, provides the one-off key, starts the node, and saves the resulting identity. On later app launches, it detects the saved state and starts without requesting another auth key. **Stop** shuts down the in-process server but intentionally preserves identity. Uninstalling the app removes the private state.
+- `native/gateway/`: authenticated single-server proxy and TV adapter.
+- `native/engine/`: Tailscale lifecycle, state, peer resolution, server probe.
+- `native/bridge/`: owned C strings and a small C ABI.
+- `kepler/`: generated Turbo Module bindings and C++ worker lifetime.
+- `src/`: TV setup and WebView lifecycle.
+- `scripts/`: deterministic checks, SDK/bootstrap tooling, device install and release staging.
 
-## Release integrity
-
-CI checks JavaScript linting, TypeScript, Jest tests, and the native C ABI lifecycle on an Ubuntu host. The ARMv7 job installs a checksum-pinned Vega SDK, rebuilds `libtailscale` from the pinned submodule source, builds the `.vpkg`, and validates it with Vega Package Tooling. The release workflow publishes only that rebuilt package and its SHA-256 checksum.
-
-These checks validate compilation and packaging. They do not substitute for runtime validation on physical hardware, which remains necessary for each release candidate.
+The test-only local coordination/DERP server is behind a Go build tag and is absent from the release bridge. Developer credentials, test accounts, the Jellyfin server, and media are never included in a VPKG.

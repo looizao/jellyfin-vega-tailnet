@@ -11,18 +11,18 @@
 
 using namespace com::amazon::kepler::turbomodule;
 
-namespace tailvega {
+namespace jellyvega {
 
 TailscaleSpec::TailscaleSpec() : KeplerTurboModule("Tailscale") {}
 
 TailscaleSpec::~TailscaleSpec() = default;
 
 void TailscaleSpec::aggregateMethods(MethodAggregator<KeplerTurboModule>& methodAggregator) const noexcept {
-  methodAggregator.addMethod("connect", &TailscaleSpec::connect);
+  methodAggregator.addMethod("start", &TailscaleSpec::start);
   methodAggregator.addMethod("status", &TailscaleSpec::status);
-  methodAggregator.addMethod("disconnect", &TailscaleSpec::disconnect);
-  methodAggregator.addMethod("probe", &TailscaleSpec::probe);
+  methodAggregator.addMethod("stop", &TailscaleSpec::stop);
+  methodAggregator.addMethod("checkServer", &TailscaleSpec::checkServer);
   methodAggregator.addMethod("engineVersion", &TailscaleSpec::engineVersion);
 }
 
-} // namespace tailvega
+} // namespace jellyvega

@@ -1,0 +1,51 @@
+{
+  "reviewed": "2026-09-13",
+  "scope": "Pinned Vega SDK 0.22 / React Native 0.72 dependency tree. See SECURITY.md. These are exceptions, not fixes. New advisories fail CI.",
+  "advisories": [
+    {
+      "url": "https://github.com/advisories/GHSA-gh4j-gqv2-49f6",
+      "package": "fast-xml-parser",
+      "title": "fast-xml-parser XMLBuilder: XML Comment and CDATA Injection via Unescaped Delimiters"
+    },
+    {
+      "url": "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
+      "package": "image-size",
+      "title": "image-size: ICNS parser allows denial of service through an infinite loop"
+    },
+    {
+      "url": "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
+      "package": "image-size",
+      "title": "image-size: JXL and HEIF parsers allow denial of service through infinite loops"
+    },
+    {
+      "url": "https://github.com/advisories/GHSA-2p57-rm9w-gvfp",
+      "package": "ip",
+      "title": "ip SSRF improper categorization in isPublic"
+    },
+    {
+      "url": "https://github.com/advisories/GHSA-r5fr-rjxr-66jc",
+      "package": "lodash",
+      "title": "lodash vulnerable to Code Injection via `_.template` imports key names"
+    },
+    {
+      "url": "https://github.com/advisories/GHSA-f23m-r3pf-42rh",
+      "package": "lodash",
+      "title": "lodash vulnerable to Prototype Pollution via array path bypass in `_.unset` and `_.omit`"
+    },
+    {
+      "url": "https://github.com/advisories/GHSA-xxjr-mmjv-4gpg",
+      "package": "lodash",
+      "title": "Lodash has Prototype Pollution Vulnerability in `_.unset` and `_.omit` functions"
+    },
+    {
+      "url": "https://github.com/advisories/GHSA-82x6-q7mm-w9cf",
+      "package": "toml",
+      "title": "toml-node: Uncontrolled Recursion"
+    },
+    {
+      "url": "https://github.com/advisories/GHSA-v5mp-jgw5-2x6j",
+      "package": "toml",
+      "title": "toml-node: Prototype Pollution Leads to `Object.prototype` Corruption via `__proto__` Key-Path Desynchronization"
+    }
+  ]
+}

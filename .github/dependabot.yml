@@ -2,16 +2,21 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
-    schedule:
-      interval: weekly
+    schedule: {interval: weekly}
+    open-pull-requests-limit: 5
     groups:
-      javascript-dependencies:
-        patterns: ['*']
+      compatible-tooling: {patterns: ['@types/*', '@playwright/*', 'prettier']}
+    ignore:
+      - dependency-name: '@amazon-devices/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: react-native
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+  - package-ecosystem: gomod
+    directory: /native
+    schedule: {interval: weekly}
   - package-ecosystem: github-actions
     directory: /
-    schedule:
-      interval: weekly
-  - package-ecosystem: gitsubmodule
-    directory: /
-    schedule:
-      interval: monthly
+    schedule: {interval: weekly}
+  - package-ecosystem: docker
+    directory: /tooling
+    schedule: {interval: monthly}

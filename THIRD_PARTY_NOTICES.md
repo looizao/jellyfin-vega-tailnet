@@ -1,15 +1,11 @@
 # Third-party notices
 
-TailVega includes and links third-party open-source software. Each dependency remains subject to its own license.
+JellyVega's initial Vega CMake, code-generation, and packaging structure derives from [looizao/tailscale-vegaos](https://github.com/looizao/tailscale-vegaos), copyright 2026 Luiz Souza, MIT licensed. That history and the original MIT notice are preserved.
 
-## libtailscale and Tailscale
+The native engine links [Tailscale](https://github.com/tailscale/tailscale) v1.102.4 and its transitive Go dependencies. Tailscale is BSD-3-Clause licensed. Dependencies retain their respective licenses; generated license files and an inventory are installed in the VPKG at `assets/licenses/` and published with releases.
 
-The `third_party/libtailscale` Git submodule is from [tailscale/libtailscale](https://github.com/tailscale/libtailscale) and is pinned to commit `80771313ac4127973677c993889fe215abcf1fbd`.
+Amazon's Vega/Kepler libraries, React Native, React, and their dependencies retain their original license terms. `scripts/collect-licenses.py` copies installed production npm license/notice files and Go module license files; the Amazon SDK itself is obtained separately from Amazon and is not redistributed as a standalone SDK.
 
-`libtailscale` and its Tailscale dependencies are Copyright Tailscale Inc. and contributors and are licensed under the BSD 3-Clause License. The authoritative license text is included in the submodule's `LICENSE` file and in the dependency source resolved by its Go module lockfile.
+The app loads [Jellyfin Web](https://github.com/jellyfin/jellyfin-web) from the user's Jellyfin server, preserving its version compatibility. Jellyfin server/web distributions and their licenses remain supplied by that server; those application bundles are not vendored into this source repository. The small TV preference/remote adapter is original MIT-licensed project code.
 
-## JavaScript and Go dependencies
-
-The exact JavaScript dependency graph is recorded in `package-lock.json`. The exact Go module graph used by `libtailscale` is recorded in `third_party/libtailscale/go.sum`. Source distributions and license information are available from the respective package authors and registries.
-
-No ownership of third-party names, logos, or trademarks is claimed. Tailscale is a registered trademark of Tailscale Inc. Amazon, Fire TV, and Vega are trademarks of their respective owners.
+Tailscale, Amazon, Vega, Fire TV, and Jellyfin names refer to their respective projects or owners. No endorsement or affiliation is implied.

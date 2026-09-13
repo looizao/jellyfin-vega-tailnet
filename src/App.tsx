@@ -1,8 +1,6 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
-  Image,
-  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,416 +8,336 @@ import {
   TextInput,
   View,
 } from 'react-native';
-
-import {tailscaleClient} from './tailscaleClient';
-import type {TailVegaSnapshot} from './types';
-
-const initialSnapshot: TailVegaSnapshot = {
-  phase: 'idle',
-  backendState: 'Stopped',
-  hostname: '',
-  dnsName: '',
-  tailnet: '',
-  ips: [],
-  onlinePeers: 0,
-  proxy: null,
-  error: null,
-};
-
-type ActionButtonProps = {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  preferred?: boolean;
-  tone?: 'primary' | 'secondary' | 'danger';
-};
-
-function ActionButton({
-  label,
-  onPress,
-  disabled = false,
-  preferred = false,
-  tone = 'primary',
-}: ActionButtonProps) {
-  const [focused, setFocused] = useState(false);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      disabled={disabled}
-      hasTVPreferredFocus={preferred}
-      onBlur={() => setFocused(false)}
-      onFocus={() => setFocused(true)}
-      onPress={onPress}
-      style={({pressed}) => [
-        styles.button,
-        tone === 'secondary' && styles.buttonSecondary,
-        tone === 'danger' && styles.buttonDanger,
-        focused && styles.buttonFocused,
-        pressed && styles.buttonPressed,
-        disabled && styles.buttonDisabled,
-      ]}>
-      <Text style={styles.buttonText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function LabelValue({label, value}: {label: string; value: string}) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text numberOfLines={1} style={styles.detailValue}>
-        {value || 'Unavailable'}
-      </Text>
-    </View>
-  );
-}
+import {client, safeError, stopped} from './client';
+import {ActionButton} from './components/ActionButton';
+import {JellyfinView} from './components/JellyfinView';
+import {LoginQR} from './components/LoginQR';
 
 export default function App() {
-  const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const [snapshot, setSnapshot] = useState(stopped);
+  const [serverUrl, setServerUrl] = useState('');
+  const [hostname, setHostname] = useState(stopped.hostname);
   const [authKey, setAuthKey] = useState('');
-  const [hostname, setHostname] = useState('fire-tv-hd');
-  const [probeAddress, setProbeAddress] = useState('');
-  const [probeMessage, setProbeMessage] = useState('');
-  const [showProxyPassword, setShowProxyPassword] = useState(false);
-
-  const busy = snapshot.phase === 'connecting' || snapshot.phase === 'stopping';
-  const connected = snapshot.phase === 'connected';
-  const statusTone = connected ? styles.statusOnline : styles.statusOffline;
-  const proxyPassword = useMemo(() => {
-    if (!snapshot.proxy) {
-      return 'Unavailable';
-    }
-    return showProxyPassword ? snapshot.proxy.password : '••••••••••••••••';
-  }, [showProxyPassword, snapshot.proxy]);
+  const [busy, setBusy] = useState(true);
+  const [error, setError] = useState('');
+  const [viewing, setViewing] = useState(false);
+  const mounted = useRef(true);
+  const active = useRef(false);
 
   useEffect(() => {
-    let mounted = true;
-    tailscaleClient.resume(hostname).then(result => {
-      if (mounted) {
-        setSnapshot(result);
-      }
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [hostname]);
-
-  const connect = useCallback(async () => {
-    if (!authKey.trim()) {
-      setSnapshot({
-        ...initialSnapshot,
-        phase: 'error',
-        error: 'Enter a one-time auth key.',
+    mounted.current = true;
+    client
+      .start()
+      .then(s => {
+        if (!mounted.current) {
+          return;
+        }
+        setSnapshot(s);
+        setServerUrl(s.serverUrl);
+        setHostname(s.hostname || stopped.hostname);
+        active.current = Boolean(s.serverUrl);
+      })
+      .catch(e => {
+        if (mounted.current) {
+          setError(safeError(e));
+        }
+      })
+      .finally(() => {
+        if (mounted.current) {
+          setBusy(false);
+        }
       });
+    let polling = false;
+    const interval = setInterval(async () => {
+      if (!active.current || polling) {
+        return;
+      }
+      polling = true;
+      try {
+        const s = await client.status();
+        if (mounted.current && active.current) {
+          setSnapshot(s);
+        }
+      } catch (e) {
+        if (mounted.current) {
+          setError(safeError(e));
+        }
+      } finally {
+        polling = false;
+      }
+    }, 2000);
+    return () => {
+      mounted.current = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  async function connect() {
+    if (!serverUrl.trim()) {
+      setError('Enter your Jellyfin server’s tailnet URL.');
       return;
     }
-    setSnapshot({...initialSnapshot, phase: 'connecting'});
-    const result = await tailscaleClient.connect(
-      authKey.trim(),
-      hostname.trim(),
-    );
+    setBusy(true);
+    setError('');
+    const key = authKey;
     setAuthKey('');
-    setSnapshot(result);
-  }, [authKey, hostname]);
-
-  const stop = useCallback(async () => {
-    setSnapshot(current => ({...current, phase: 'stopping'}));
-    setSnapshot(await tailscaleClient.disconnect());
-    setProbeMessage('');
-  }, []);
-
-  const refresh = useCallback(async () => {
-    setSnapshot(await tailscaleClient.refresh());
-  }, []);
-
-  const probe = useCallback(async () => {
-    const address = probeAddress.trim();
-    if (!address) {
-      setProbeMessage('Enter a tailnet host and port, for example nas:22.');
-      return;
-    }
-    setProbeMessage('Probing through the tailnet…');
     try {
-      const result = await tailscaleClient.probe(address);
-      setProbeMessage(`Reached ${result.address} in ${result.latencyMs} ms.`);
-    } catch (error) {
-      setProbeMessage(error instanceof Error ? error.message : 'Probe failed.');
+      const s = await client.start(serverUrl, hostname, key);
+      if (mounted.current) {
+        setSnapshot(s);
+        active.current = true;
+      }
+    } catch (e) {
+      if (mounted.current) {
+        setError(safeError(e));
+      }
+    } finally {
+      if (mounted.current) {
+        setBusy(false);
+      }
     }
-  }, [probeAddress]);
+  }
 
+  async function stop() {
+    setBusy(true);
+    setError('');
+    active.current = false;
+    try {
+      await client.stop();
+      setSnapshot({...stopped, serverUrl, hostname});
+    } catch (e) {
+      setError(safeError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function open() {
+    setBusy(true);
+    setError('');
+    try {
+      await client.checkServer();
+      if (mounted.current) {
+        setViewing(true);
+      }
+    } catch (e) {
+      if (mounted.current) {
+        setError(safeError(e));
+      }
+    } finally {
+      if (mounted.current) {
+        setBusy(false);
+      }
+    }
+  }
+
+  if (viewing && snapshot.webUrl) {
+    return (
+      <JellyfinView
+        url={snapshot.webUrl}
+        onSettings={() => setViewing(false)}
+      />
+    );
+  }
+  const running = snapshot.state === 'Running';
+  const enrolled = snapshot.state !== 'Stopped';
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.page}>
         <View style={styles.header}>
-          <Image
-            accessibilityLabel="TailVega secure mesh icon"
-            source={require('../assets/image/tailvega-icon.png')}
-            style={styles.logo}
-          />
+          <View style={styles.mark}>
+            <Text style={styles.markText}>JV</Text>
+          </View>
           <View>
-            <Text style={styles.eyebrow}>TAILSCALE FOR VEGA OS</Text>
-            <Text style={styles.title}>TailVega</Text>
-            <Text style={styles.subtitle}>
-              Experimental userspace tailnet access for Fire TV
-            </Text>
+            <Text style={styles.eyebrow}>YOUR LIBRARY. YOUR TAILNET.</Text>
+            <Text style={styles.title}>JellyVega</Text>
           </View>
-          <View style={[styles.statusPill, statusTone]}>
-            <Text style={styles.statusText}>{snapshot.backendState}</Text>
+          <View style={[styles.badge, running && styles.connected]}>
+            <Text style={styles.badgeText}>
+              {running ? 'Tailnet connected' : snapshot.state}
+            </Text>
           </View>
         </View>
-
-        {!connected ? (
-          <View style={styles.panel}>
-            <Text style={styles.panelTitle}>Join your tailnet</Text>
-            <Text style={styles.helpText}>
-              Create a one-time, pre-authorized key in the Tailscale admin
-              console. The key is passed directly to the embedded engine and
-              cleared from this screen after use.
-            </Text>
-
-            <Text style={styles.inputLabel}>Device name</Text>
-            <TextInput
-              accessibilityLabel="Tailscale device name"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!busy}
-              onChangeText={setHostname}
-              placeholder="fire-tv-hd"
-              placeholderTextColor="#607089"
-              style={styles.input}
-              value={hostname}
-            />
-
-            <Text style={styles.inputLabel}>One-time auth key</Text>
-            <TextInput
-              accessibilityLabel="One-time Tailscale auth key"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!busy}
-              onChangeText={setAuthKey}
-              placeholder="tskey-auth-…"
-              placeholderTextColor="#607089"
-              secureTextEntry
-              style={styles.input}
-              value={authKey}
-            />
-
-            {snapshot.error ? (
-              <Text accessibilityRole="alert" style={styles.errorText}>
-                {snapshot.error}
-              </Text>
-            ) : null}
-
-            <View style={styles.actionRow}>
-              <ActionButton
-                disabled={busy}
-                label={busy ? 'Connecting…' : 'Connect'}
-                onPress={connect}
-                preferred
-              />
-              {busy ? <ActivityIndicator color="#62e6d8" size="large" /> : null}
-            </View>
-          </View>
-        ) : (
-          <>
-            <View style={styles.grid}>
-              <View style={[styles.panel, styles.gridPanel]}>
-                <Text style={styles.panelTitle}>Node</Text>
-                <LabelValue label="Host" value={snapshot.hostname} />
-                <LabelValue label="MagicDNS" value={snapshot.dnsName} />
-                <LabelValue label="Tailnet" value={snapshot.tailnet} />
-                <LabelValue label="Addresses" value={snapshot.ips.join(', ')} />
-                <LabelValue
-                  label="Online peers"
-                  value={String(snapshot.onlinePeers)}
-                />
-              </View>
-
-              <View style={[styles.panel, styles.gridPanel]}>
-                <Text style={styles.panelTitle}>Local SOCKS5 endpoint</Text>
-                <LabelValue
-                  label="Address"
-                  value={snapshot.proxy?.address ?? ''}
-                />
-                <LabelValue
-                  label="Username"
-                  value={snapshot.proxy?.username ?? ''}
-                />
-                <LabelValue label="Password" value={proxyPassword} />
-                <ActionButton
-                  label={
-                    showProxyPassword ? 'Hide password' : 'Reveal password'
-                  }
-                  onPress={() => setShowProxyPassword(value => !value)}
-                  tone="secondary"
-                />
-              </View>
-            </View>
-
-            <View style={styles.panel}>
-              <Text style={styles.panelTitle}>Test a tailnet service</Text>
-              <Text style={styles.helpText}>
-                Enter a MagicDNS name or Tailscale IP with a TCP port.
-              </Text>
-              <View style={styles.probeRow}>
-                <TextInput
-                  accessibilityLabel="Tailnet host and port"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  onChangeText={setProbeAddress}
-                  placeholder="nas:22 or 100.64.0.10:443"
-                  placeholderTextColor="#607089"
-                  style={[styles.input, styles.probeInput]}
-                  value={probeAddress}
-                />
-                <ActionButton label="Probe" onPress={probe} />
-              </View>
-              {probeMessage ? (
-                <Text style={styles.probeMessage}>{probeMessage}</Text>
-              ) : null}
-            </View>
-
-            <View style={styles.actionRow}>
-              <ActionButton
-                label="Refresh"
-                onPress={refresh}
-                tone="secondary"
-              />
-              <ActionButton label="Stop" onPress={stop} tone="danger" />
-            </View>
-          </>
-        )}
-
-        <View style={styles.notice}>
-          <Text style={styles.noticeTitle}>Vega OS limitation</Text>
-          <Text style={styles.noticeText}>
-            Vega does not currently expose a public VPN or TUN API. TailVega
-            joins the tailnet in userspace and can dial tailnet services, but it
-            cannot route all Fire TV apps or act as a device-wide exit-node
-            client.
+        <View style={styles.panel}>
+          <Text style={styles.heading}>
+            {running
+              ? 'Your home cinema is connected'
+              : 'Bring your home library to this TV'}
           </Text>
+          <Text style={styles.help}>
+            Connect to your tailnet, then sign in to Jellyfin. Your server stays
+            private.
+          </Text>
+          <Text style={styles.label}>Jellyfin server</Text>
+          <TextInput
+            accessibilityLabel="Jellyfin server URL"
+            value={serverUrl}
+            onChangeText={setServerUrl}
+            editable={!busy && !enrolled}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="http://nas:8096"
+            placeholderTextColor="#73849e"
+            style={styles.input}
+          />
+          {!enrolled && (
+            <>
+              <Text style={styles.label}>Name for this TV</Text>
+              <TextInput
+                accessibilityLabel="Tailscale device name"
+                value={hostname}
+                onChangeText={setHostname}
+                editable={!busy}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.input}
+              />
+              <Text style={styles.label}>Tailscale auth key · optional</Text>
+              <TextInput
+                accessibilityLabel="Optional Tailscale auth key"
+                value={authKey}
+                onChangeText={setAuthKey}
+                editable={!busy}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+                placeholder="Leave empty to sign in with your browser"
+                placeholderTextColor="#73849e"
+                style={styles.input}
+              />
+            </>
+          )}
+          {snapshot.authUrl && !running && (
+            <View style={styles.pairing}>
+              <Text style={styles.heading}>
+                Approve this TV in your browser
+              </Text>
+              <LoginQR url={snapshot.authUrl} />
+              <Text selectable style={styles.link}>
+                {snapshot.authUrl}
+              </Text>
+              <Text style={styles.help}>
+                Open this link on your phone or computer and choose your home
+                tailnet. This screen updates automatically.
+              </Text>
+            </View>
+          )}
+          {snapshot.state === 'NeedsMachineAuth' && (
+            <Text style={styles.help}>
+              Approve this device in the Tailscale admin console.
+            </Text>
+          )}
+          {!!snapshot.ips.length && (
+            <Text style={styles.help}>
+              TV address: {snapshot.ips.join(' · ')}
+            </Text>
+          )}
+          {!!error && (
+            <Text accessibilityRole="alert" style={styles.error}>
+              {error}
+            </Text>
+          )}
+          {busy && <ActivityIndicator size="large" color="#a78bfa" />}
+          <View style={styles.buttons}>
+            {!enrolled && (
+              <ActionButton
+                label="Connect to tailnet"
+                preferred
+                disabled={busy}
+                onPress={() => {
+                  connect();
+                }}
+              />
+            )}
+            {running && (
+              <ActionButton
+                label="Open Jellyfin"
+                preferred
+                disabled={busy}
+                onPress={() => {
+                  open();
+                }}
+              />
+            )}
+            {enrolled && (
+              <ActionButton
+                label="Disconnect / change server"
+                secondary
+                disabled={busy}
+                onPress={() => {
+                  stop();
+                }}
+              />
+            )}
+          </View>
         </View>
-
-        <Text style={styles.footer}>{tailscaleClient.engineVersion()}</Text>
+        <Text style={styles.footer}>
+          Use the directional pad in Jellyfin. Press Menu (☰) to return here.
+          Home leaves the app.
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {flex: 1, backgroundColor: '#07111f'},
-  page: {paddingHorizontal: 64, paddingVertical: 42, gap: 24},
-  header: {alignItems: 'center', flexDirection: 'row', gap: 22},
-  logo: {borderRadius: 24, height: 92, width: 92},
-  eyebrow: {
-    color: '#62e6d8',
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 2.4,
-  },
-  title: {color: '#f4f8ff', fontSize: 42, fontWeight: '800', letterSpacing: -1},
-  subtitle: {color: '#a9b8cc', fontSize: 18, marginTop: 2},
-  statusPill: {
-    borderRadius: 18,
-    marginLeft: 'auto',
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-  },
-  statusOnline: {backgroundColor: '#0b685f'},
-  statusOffline: {backgroundColor: '#28364a'},
-  statusText: {color: '#ffffff', fontSize: 16, fontWeight: '700'},
-  panel: {
-    backgroundColor: '#101e30',
-    borderColor: '#263a52',
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 26,
-  },
-  panelTitle: {
-    color: '#f4f8ff',
-    fontSize: 25,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  helpText: {
-    color: '#a9b8cc',
-    fontSize: 17,
-    lineHeight: 25,
-    marginBottom: 18,
-    maxWidth: 920,
-  },
-  inputLabel: {
-    color: '#d6e0ed',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 7,
-    marginTop: 10,
-  },
-  input: {
-    backgroundColor: '#071422',
-    borderColor: '#35506c',
-    borderRadius: 12,
-    borderWidth: 2,
-    color: '#f4f8ff',
-    fontSize: 19,
-    paddingHorizontal: 17,
-    paddingVertical: 13,
-  },
-  errorText: {color: '#ff9c9c', fontSize: 16, marginTop: 14},
-  actionRow: {
+  root: {flex: 1, backgroundColor: '#080d18'},
+  page: {padding: 48, paddingHorizontal: 68},
+  header: {flexDirection: 'row', alignItems: 'center', marginBottom: 30},
+  mark: {
+    width: 82,
+    height: 82,
+    borderRadius: 24,
+    backgroundColor: '#7c4dff',
+    justifyContent: 'center',
     alignItems: 'center',
-    flexDirection: 'row',
-    gap: 18,
-    marginTop: 18,
+    marginRight: 24,
   },
-  button: {
-    backgroundColor: '#168c80',
-    borderColor: 'transparent',
-    borderRadius: 12,
-    borderWidth: 3,
-    minWidth: 150,
-    paddingHorizontal: 24,
-    paddingVertical: 13,
+  markText: {color: '#fff', fontSize: 34, fontWeight: '800'},
+  eyebrow: {color: '#a5f3fc', letterSpacing: 3, fontSize: 14, marginBottom: 4},
+  title: {fontSize: 46, color: '#f5f7ff', fontWeight: '700'},
+  badge: {
+    marginLeft: 'auto',
+    borderRadius: 24,
+    backgroundColor: '#26354e',
+    paddingHorizontal: 22,
+    paddingVertical: 12,
   },
-  buttonSecondary: {backgroundColor: '#263a52'},
-  buttonDanger: {backgroundColor: '#7a3041'},
-  buttonFocused: {borderColor: '#ffffff', transform: [{scale: 1.04}]},
-  buttonPressed: {opacity: 0.82},
-  buttonDisabled: {opacity: 0.45},
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  grid: {flexDirection: 'row', gap: 24},
-  gridPanel: {flex: 1},
-  detailRow: {
-    borderBottomColor: '#263a52',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: 16,
-    paddingVertical: 10,
-  },
-  detailLabel: {color: '#8fa2b9', fontSize: 15, width: 118},
-  detailValue: {color: '#e8f0fa', flex: 1, fontSize: 16, fontWeight: '600'},
-  probeRow: {alignItems: 'center', flexDirection: 'row', gap: 16},
-  probeInput: {flex: 1},
-  probeMessage: {color: '#8ff4e8', fontSize: 16, marginTop: 14},
-  notice: {
-    backgroundColor: '#2a2518',
-    borderColor: '#65552a',
-    borderRadius: 14,
+  connected: {backgroundColor: '#165346'},
+  badgeText: {fontSize: 18, color: '#e1fff6'},
+  panel: {
+    padding: 32,
+    borderRadius: 20,
+    borderColor: '#28344a',
     borderWidth: 1,
-    padding: 18,
+    backgroundColor: '#111b2c',
   },
-  noticeTitle: {
-    color: '#ffe199',
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: 5,
+  heading: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#f5f7ff',
+    marginBottom: 10,
   },
-  noticeText: {color: '#d8cda9', fontSize: 15, lineHeight: 22},
-  footer: {color: '#607089', fontSize: 13, textAlign: 'right'},
+  help: {fontSize: 19, lineHeight: 28, color: '#b3c0d6', marginBottom: 10},
+  label: {fontSize: 18, color: '#d2dcf0', marginTop: 15, marginBottom: 8},
+  input: {
+    fontSize: 22,
+    color: '#fff',
+    borderColor: '#51627d',
+    borderWidth: 2,
+    borderRadius: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    backgroundColor: '#0b1320',
+  },
+  buttons: {flexDirection: 'row', flexWrap: 'wrap', marginTop: 12},
+  pairing: {
+    backgroundColor: '#1d2b46',
+    padding: 22,
+    borderRadius: 14,
+    marginTop: 22,
+  },
+  link: {fontSize: 26, color: '#a5f3fc', marginVertical: 12},
+  error: {color: '#fda4af', fontSize: 20, marginTop: 20, marginBottom: 10},
+  footer: {color: '#8293ad', fontSize: 17, marginTop: 22},
 });

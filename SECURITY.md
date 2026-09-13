@@ -1,37 +1,21 @@
-# Security policy
+# Security
 
-## Supported versions
+JellyVega handles a Tailscale node identity and a Jellyfin session. Keep application data private and revoke the node/session if the TV is lost. Report vulnerabilities through the repository's GitHub Security Advisories interface. Do not include auth keys, browser tokens, account passwords, node-state files, or unredacted traces in public issues.
 
-Until the project reaches a stable release, only the latest published release is supported with security fixes.
+## Boundaries
 
-## Report a vulnerability
+The embedded Tailscale connection belongs to this app. The HTTP gateway binds only to 127.0.0.1, requires a random session credential, validates Host/Origin, forwards to one configured server, and resolves only tailnet addresses. Its HttpOnly credential is stripped before proxying. CSP restricts web media and scripts to the gateway. HTTPS upstream certificates are verified normally. There is no general SOCKS proxy, arbitrary target parameter, TLS-bypass switch, or incoming tailnet listener in the release.
 
-Please do not open a public issue for a vulnerability or include secrets in logs. Use GitHub's private vulnerability reporting for `looizao/tailscale-vegaos`. Include the affected version, impact, reproduction steps, and a minimal redacted proof of concept.
+Enrollment keys are never stored in settings, build artifacts, or source. Tailscale must retain node identity on disk to reconnect. Keys can exist in native/Go memory during enrollment; memory erasure is not guaranteed. Jellyfin manages its own WebView session storage. Switching servers clears browser storage before loading the new application.
 
-If private reporting is not enabled, open a public issue containing only a request for a private contact channel and no vulnerability details.
+Loopback is a convenience boundary, not isolation from a compromised OS or malicious privileged local process. An attacker that controls the configured Jellyfin server controls the web client served by it. Tailscale coordination/relay behavior and its upstream engine remain part of the trust model. Developer Mode and a development build also require trusting the development machine.
 
-## Threat model
+## Dependency status
 
-TailVega handles a Tailscale auth key once during enrollment, a persistent Tailscale node identity, tailnet metadata, and a generated local SOCKS5 credential. Its controls include:
+The Go engine is pinned to Tailscale 1.102.4 and built with Go 1.26.8. Initial `govulncheck` analysis found no reachable vulnerabilities; CI repeats this analysis. Four module-level findings were outside imported/reachable packages at initial validation. This is not a guarantee against unknown issues.
 
-- Secure text entry for the auth key.
-- Clearing JavaScript and C++ auth-key buffers after use when their runtimes permit.
-- A one-off auth-key recommendation.
-- Engine logging disabled by default.
-- Node state stored in the package's private Vega data directory.
-- A randomly generated password on the `tsnet` SOCKS5 endpoint.
-- No release-time secrets or prebuilt native libraries in the repository.
+Amazon's compatible React Native 0.72 / SDK 0.22 tree inherits npm advisories in build/development dependencies including lodash, ip, image-size, toml, and fast-xml-parser. Compatible `npm audit fix` does not clear all findings. Major React Native replacement would break the pinned Vega integration, and some dependencies have no compatible fixed release.
 
-Residual risks include secrets existing temporarily in managed JavaScript strings or native process memory, compromise of the Fire TV or development host, upstream supply-chain compromise, policy mistakes that grant the node excessive access, and unknown behavior on an untested Vega build.
+The reviewed advisory URLs are recorded in `security/npm-advisories.json`. CI rejects newly reported advisories outside that list. The exceptions are explicit accepted preview limitations, not vulnerability fixes or a blanket clean audit. Do not expose Metro/the SDK development server to untrusted networks or build untrusted inputs. The release app does not launch Metro. Reassess these exceptions when updating Amazon's SDK and packages.
 
-Use a dedicated restricted tag or identity when practical, grant only required tailnet destinations, keep Vega OS updated, verify release checksums, and remove stale devices from the Tailscale admin console.
-
-## Pinned Vega toolchain advisories
-
-The React Native 0.72 and `@amazon-devices/react-native-kepler` 2.1.0 dependency set required by Vega OS 1.1 currently pulls known npm advisories through Metro and React Native CLI packages, including `image-size`, `ip`, and `fast-xml-parser`. These packages run on the build host and are not imported into TailVega's device bundle. Forced npm remediation upgrades React Native to an incompatible non-Vega release, so the repository intentionally retains Amazon's supported versions.
-
-Only build trusted branches and image assets, run builds on disposable CI workers, and review Dependabot alerts for a compatible Amazon package update. This exception does not cover a vulnerability that becomes reachable in the shipped application.
-
-## Scope limitation
-
-TailVega is not a device-wide VPN and does not protect or reroute traffic from other Fire TV apps. The local SOCKS5 endpoint is usable only by software that explicitly connects to it.
+Use limited Tailscale grants and a Jellyfin account appropriate for a TV. Never embed a reusable auth key in CI secrets just to make tests pass: all automated tests use disposable local coordination and generated accounts.

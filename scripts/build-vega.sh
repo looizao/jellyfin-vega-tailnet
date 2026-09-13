@@ -5,6 +5,8 @@ build_type="${1:-Release}"
 build_version="${BUILD_VERSION:-$(node -p "require('./package.json').version")}"
 build_number="${BUILD_NUMBER:-1}"
 
+python3 scripts/collect-licenses.py
+
 exec npx react-native build-vega \
   --build-type "$build_type" \
   --target armv7 \

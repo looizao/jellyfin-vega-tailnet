@@ -1,154 +1,63 @@
-# Setup and installation
+# Install on Fire TV Stick HD (2nd generation, 2026)
 
-This guide targets the Fire TV Stick HD (2nd Generation, 2026) running Vega OS 1.1. Amazon's Vega SDK 0.22 documentation confirms that Fire TV packages use ARMv7 and are installed as `.vpkg` files.
+This package targets ARMv7 Vega OS. Verify the model under Settings → My Fire TV → About. The physical device has not yet been tested with JellyVega; use the preview release to perform the checks below.
 
-## Before you begin
+## Prepare the home server
 
-You need:
+1. Run Jellyfin and Tailscale on the home server (or expose Jellyfin on a port of an existing tailnet peer).
+2. From a different tailnet device, check `http://SERVER_TAILSCALE_IP:8096/System/Info/Public` and the Jellyfin web interface. Use your actual HTTPS URL/port/base path if configured.
+3. Allow the TV node to reach that server and port in your Tailscale policy. A login identity or tagged node must have appropriate grants. Device approval may also be required.
+4. Enable Jellyfin remote connections and allow remote access for the Jellyfin account. The TV's Tailscale address can be classified as remote by Jellyfin.
+5. Enable transcoding for media the stick's WebView cannot decode. Begin testing with 1080p or lower H.264 video and AAC audio. Lower the Jellyfin playback quality if your home upload or a relayed Tailscale connection is slow.
 
-- A Fire TV Stick HD (2nd Generation) updated to Vega OS 1.1.
-- An Amazon Developer account.
-- A supported Ubuntu 22.04 development machine with a USB data cable.
-- Vega SDK `0.22.5850` and its prerequisites.
-- A Tailscale tailnet whose administrator can create an auth key.
-- The TailVega ARMv7 `.vpkg` and matching `.sha256` file from GitHub Releases.
+Use Tailscale IPs or MagicDNS names of tailnet peers. This preview does not accept ordinary LAN IPs/subnet routes. HTTPS uses normal certificate validation; self-signed certificates must have a trusted chain on the device. For an HTTP Jellyfin port, the segment between Tailscale peers is still encrypted by Tailscale.
 
-Developer Mode allows sideloaded code and a developer shell. Enable it only on a device you control, do not expose the developer connection to untrusted networks, and disable it when you no longer need it.
+## Enable Amazon Developer Mode
 
-## 1. Install the Vega SDK
+Install Amazon's Vega SDK on a supported development host. Builds here use SDK `0.22.5850`; the included installer pins and verifies Amazon's bootstrap script. Device authentication may need the current Vega CLI. Follow [Amazon's current Developer Mode instructions](https://developer.amazon.com/docs/vega/0.24/developer-mode) for your device software.
 
-Install the SDK using Amazon's official [Vega SDK setup instructions](https://developer.amazon.com/docs/vega/0.22/setup-overview). This repository pins SDK `0.22.5850` in `vega-sdk-requirements.json` because it targets Vega OS 1.1.
+In Settings → My Fire TV → About, select the device name seven times. Return to Developer Options and begin enabling Developer Mode. Authenticate the CLI and enter the temporary code displayed by the device:
 
-After installation, open a new shell or load the environment:
-
-```bash
-source "$HOME/vega/env"
-vega --version
+```sh
+vega devmode login
+vega devmode enable-device --code DEVICE_CODE
+vega device list
 ```
 
-## 2. Enable Developer Mode
+Complete Amazon account verification in your own browser. The device reboots when enabled. USB is the simplest initial connection. Amazon also documents [device connections](https://developer.amazon.com/docs/vega/0.24/run-apps) where supported. Keep developer access on a trusted local network.
 
-Amazon documents the current process in [Enable Developer Mode](https://developer.amazon.com/docs/vega/0.22/developer-mode).
+Amazon controls developer access and package-signing requirements. A successful VPT build does not grant Appstore approval or bypass device enrollment. If your OS requires an Amazon-issued developer signature, use its signing flow before installation.
 
-1. Connect the Fire TV Stick to the development machine using a USB data cable.
-2. On Fire TV, open **Settings > My Fire TV > About**.
-3. Select the device name, then press the remote's center button seven times.
-4. Go back to **My Fire TV > Developer options > Developer Mode** and select **Continue**. Keep the six-digit code visible.
-5. On the development machine, authenticate the CLI:
+## Install the release
 
-   ```bash
-   vega devmode login
-   ```
+Download the ARMv7 VPKG and SHA256SUMS from this repository's Releases page. Verify the VPKG's entry using `sha256sum` (or download all listed assets and run `sha256sum -c SHA256SUMS`). Then:
 
-6. Complete the browser authorization, then enable the device with the code shown on the TV:
-
-   ```bash
-   vega devmode enable-device --code 123456
-   ```
-
-7. Wait for the Fire TV to reboot. Confirm **Developer Mode: Enabled**, then verify the connection:
-
-   ```bash
-   vega device list
-   ```
-
-If more than one device is attached, add `-d <serial>` immediately after `vega device` in later commands.
-
-## 3. Download and verify TailVega
-
-Download both files from the [latest GitHub release](https://github.com/looizao/tailscale-vegaos/releases/latest):
-
-- `TailVega-<version>-armv7.vpkg`
-- `TailVega-<version>-armv7.vpkg.sha256`
-
-Keep them in the same directory and verify the package before sideloading:
-
-```bash
-sha256sum -c TailVega-<version>-armv7.vpkg.sha256
+```sh
+vega exec vpt validate JellyVega-0.1.0-armv7.vpkg
+vega device -d DEVICE_SERIAL install-app --packagePath JellyVega-0.1.0-armv7.vpkg
+vega device -d DEVICE_SERIAL launch-app --appName com.looizao.jellyvega.main
 ```
 
-The command must print `OK`. Do not install a package with a mismatched checksum.
+The repository includes `scripts/install-device.sh` to validate, install, and launch with an explicit device serial. Development apps may require launching through the CLI on some device software.
 
-## 4. Install and launch
+## Connect
 
-With one Fire TV connected:
+Enter the Jellyfin server root, select **Connect to tailnet**, and open the displayed Tailscale login URL in your own browser. Approve the node, wait for **Tailnet connected**, and select **Open Jellyfin**. Alternatively, enter a one-off, non-ephemeral auth key with a short enrollment expiry. The key field clears after submission. The Jellyfin username/password belongs in Jellyfin's own sign-in screen.
 
-```bash
-vega device install-app --packagePath TailVega-<version>-armv7.vpkg
-vega device launch-app --appName com.looizao.tailvega.main
-```
+Menu (☰) opens connection settings. Back navigates Jellyfin. Disconnect stops the gateway and Tailscale node but preserves identity. To remove access permanently, revoke the node in the Tailscale admin console and clear/uninstall the application's data. Sign out inside Jellyfin to remove its current session.
 
-With several devices connected:
+## Device verification
 
-```bash
-vega device -d <serial> install-app --packagePath TailVega-<version>-armv7.vpkg
-vega device -d <serial> launch-app --appName com.looizao.tailvega.main
-```
+- Approve enrollment, browse a library, and start a known H.264/AAC file.
+- Test remote focus, Back, Menu, play/pause, seeking, and subtitles.
+- Test a file requiring transcoding and watch for at least 30 minutes.
+- Leave and reopen the app; reboot the stick and confirm identity/login reuse.
+- Try a real remote network, inspect direct/relayed connectivity in Tailscale, and measure playback stability.
 
-To remove TailVega later:
-
-```bash
-vega device uninstall-app --appName com.looizao.tailvega.main
-```
-
-Uninstalling removes the app and its private saved Tailscale identity. Also delete the corresponding machine from the Tailscale admin console if it should no longer have tailnet access.
-
-## 5. Create a safe Tailscale auth key
-
-Open the Tailscale admin console's [Keys page](https://login.tailscale.com/admin/settings/keys) and select **Generate auth key**.
-
-Use these settings:
-
-- **Reusable:** off. A one-off key is automatically revoked after its first use.
-- **Expiration:** the shortest practical value.
-- **Ephemeral:** off. TailVega stores and resumes one node identity.
-- **Pre-approved:** on only if your tailnet uses device approval and you want to skip manual approval.
-- **Tags:** optionally assign a tightly restricted tag, such as `tag:firetv`, if your policy is designed for it.
-
-Never place the key in an issue, log, source file, shell history, or screenshot. TailVega uses it only to configure the embedded engine and then clears the UI field and native input buffer. The engine persists its node key in TailVega's private app data so the one-off auth key is not needed again.
-
-## 6. Join the tailnet
-
-1. Open TailVega on the Fire TV.
-2. Enter a hostname such as `living-room-fire-tv`.
-3. Enter the one-off auth key.
-4. Select **Connect**.
-5. Confirm that the TailVega node appears on the Tailscale admin console's Machines page.
-
-Use **Probe a tailnet service** to test a TCP destination such as `nas:22` or `100.64.0.10:443`. TailVega also displays the local SOCKS5 address and generated password while connected.
-
-The SOCKS5 listener is local to the Fire TV app environment. Other Fire TV applications will use it only if they support an explicit proxy and can reach that listener. TailVega does not change Vega OS network routing.
+For live help, provide the device serial/IP and server tailnet URL. Complete Amazon/Tailscale authentication in your browser; do not commit credentials or put them in a GitHub issue.
 
 ## Troubleshooting
 
-### `vega device list` is empty
+“Not a visible tailnet peer”: check that the TV joined the correct tailnet and can see the server. Try its numeric Tailscale IP. “Unreachable”: verify the port/base path, TLS certificate, Jellyfin remote access, and tailnet grants. “NeedsMachineAuth”: approve the node in Tailscale admin. Local-port errors: fully close another JellyVega process and retry.
 
-- Confirm the cable supports data, not only power.
-- Reopen Developer Mode and confirm it is enabled.
-- Disconnect other USB devices and retry.
-- Follow Amazon's [run-on-device guide](https://developer.amazon.com/docs/vega/0.22/run-apps).
-
-### Package installation fails
-
-- Confirm the file name contains `armv7`.
-- Verify the checksum again.
-- Confirm the target runs Vega OS 1.1 and your CLI uses the pinned 0.22 SDK.
-- Inspect installed packages with `vega device installed-packages`.
-
-### TailVega cannot join
-
-- Confirm the Fire TV has internet access and its date and time are correct.
-- Generate a new one-off auth key if the old one expired or was already used.
-- If device approval is enabled, approve the new machine or use a pre-approved key.
-- If Tailnet Lock is enabled, use a pre-signed auth key according to Tailscale's policy.
-
-### A service probe fails
-
-- Use `host:port`, not a URL. For example, use `nas:443`, not `https://nas`.
-- Confirm the peer is online and its service listens on that port.
-- Check Tailscale grants or ACLs for the TailVega node or tag.
-- Try the peer's Tailscale IP to distinguish MagicDNS from routing or policy issues.
-
-### Collect logs
-
-Do not post auth keys, node keys, SOCKS credentials, tailnet names, or private IP addresses publicly. Use the Vega CLI logging commands documented for SDK 0.22 and redact sensitive values before attaching logs to an issue.
+A 502 page during a stream indicates an upstream connection problem. A playable UI with a black video can instead indicate codec or transcoding support; try H.264/AAC and lower playback quality. External content plugins/redirects are intentionally constrained to the configured server. See the physical-device checklist before assuming desktop Chromium behavior matches the stick.

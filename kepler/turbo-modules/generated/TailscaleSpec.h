@@ -22,7 +22,7 @@
 #include <string>
 #include <vector>
 
-namespace tailvega {
+namespace jellyvega {
 
 class TailscaleSpec : public com::amazon::kepler::turbomodule::KeplerTurboModule {
 protected:
@@ -32,11 +32,11 @@ protected:
 public:
   void aggregateMethods(com::amazon::kepler::turbomodule::MethodAggregator<KeplerTurboModule>& methodAggregator) const noexcept override;
 
-  virtual com::amazon::kepler::turbomodule::Promise connect(std::string authKey, std::string hostname) = 0;
+  virtual com::amazon::kepler::turbomodule::Promise start(std::string config) = 0;
   virtual com::amazon::kepler::turbomodule::Promise status() = 0;
-  virtual com::amazon::kepler::turbomodule::Promise disconnect() = 0;
-  virtual com::amazon::kepler::turbomodule::Promise probe(std::string address) = 0;
+  virtual com::amazon::kepler::turbomodule::Promise stop() = 0;
+  virtual com::amazon::kepler::turbomodule::Promise checkServer() = 0;
   virtual std::string engineVersion() = 0;
 };
 
-} // namespace tailvega
+} // namespace jellyvega

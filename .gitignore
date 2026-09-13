@@ -15,3 +15,14 @@ coverage/
 .DS_Store
 .idea/
 .vscode/settings.json
+
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+test-results/
+playwright-report/
+assets/licenses/
+.qa-skill-pack/

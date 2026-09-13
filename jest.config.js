@@ -5,6 +5,6 @@ module.exports = {
   setupFiles: ['<rootDir>/test/jest.setup.ts'],
   transform: {
     '^.+\\.(js|jsx)$': 'babel-jest',
-    '^.+\\.(ts|tsx)$': ['ts-jest', {tsconfig: 'tsconfig.json'}],
+    '^.+\\.(ts|tsx)$': ['ts-jest', {tsconfig: 'tsconfig.json', babelConfig: true}],
   },
 };

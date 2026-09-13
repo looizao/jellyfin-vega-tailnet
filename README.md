@@ -1,86 +1,70 @@
-# TailVega
+# JellyVega
 
-[![CI](https://github.com/looizao/tailscale-vegaos/actions/workflows/ci.yml/badge.svg)](https://github.com/looizao/tailscale-vegaos/actions/workflows/ci.yml)
-[![Release](https://github.com/looizao/tailscale-vegaos/actions/workflows/release.yml/badge.svg)](https://github.com/looizao/tailscale-vegaos/actions/workflows/release.yml)
-[![Latest release](https://img.shields.io/github/v/release/looizao/tailscale-vegaos?display_name=tag)](https://github.com/looizao/tailscale-vegaos/releases/latest)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/looizao/jellyfin-vega-tailnet/actions/workflows/ci.yml/badge.svg)](https://github.com/looizao/jellyfin-vega-tailnet/actions/workflows/ci.yml)
+[![Release](https://github.com/looizao/jellyfin-vega-tailnet/actions/workflows/release.yml/badge.svg)](https://github.com/looizao/jellyfin-vega-tailnet/releases)
 
-![TailVega icon](docs/images/tailvega-icon.png)
+Jellyfin over your home tailnet, in **one ARMv7 Vega `.vpkg`** for the **Fire TV Stick HD, 2nd generation (2026)**.
 
-TailVega is an experimental Tailscale client for the 2026 Fire TV Stick HD (2nd Generation) running Vega OS 1.1. It embeds the official open-source Tailscale userspace engine in a Vega React Native app and builds an ARMv7 `.vpkg` that can be sideloaded in Developer Mode.
+JellyVega embeds Tailscale's official `tsnet` engine and opens your server's matching Jellyfin Web interface in Amazon's media-capable WebView. Enrollment, browsing, sign-in, video, subtitles, and WebSocket traffic stay in the app's connection. No public Jellyfin port or separate Tailscale app is needed. The Jellyfin server continues running at home.
 
-> [!IMPORTANT]
-> TailVega is a userspace tailnet node, not a device-wide VPN. Vega OS does not expose a public VPN or TUN API to third-party apps. TailVega can reach tailnet services through its built-in TCP probe and exposes a password-protected SOCKS5 endpoint to clients that can explicitly use it. It cannot transparently route Fire TV apps, advertise routes, or act as an exit node.
+**Status: device-testing preview.** Native packaging and local network/browser tests are automated. Playback and remote behavior on a physical Fire TV still need verification. Amazon Developer Mode is required for installation; this is not an Amazon Appstore listing.
 
-## What works
+![Jellyfin 12 TV library in Chromium, reached through the embedded test tailnet](docs/images/jellyfin-library.png)
 
-- Joins a tailnet with a one-off Tailscale auth key.
-- Persists node identity in the app's private data directory and resumes it on later launches.
-- Shows the node name, MagicDNS name, addresses, tailnet, and online peer count.
-- Opens TCP connections to tailnet services from the native app.
-- Starts a local, password-protected SOCKS5 endpoint from `tsnet`.
-- Stops the embedded node without deleting its saved identity.
+## Install
 
-The project targets ARMv7, Vega OS 1.1, Vega SDK `0.22.5850`, React Native `0.72`, Go `1.25.5`, and `libtailscale` commit `80771313ac4127973677c993889fe215abcf1fbd` (Tailscale `v1.94.1`).
+1. Download the `.vpkg` and `SHA256SUMS` from [Releases](https://github.com/looizao/jellyfin-vega-tailnet/releases).
+2. Follow [INSTALL.md](docs/INSTALL.md) to enable Amazon Developer Mode and connect the stick.
+3. Verify the downloaded package against its entry in `SHA256SUMS`, then run:
 
-## Install on Fire TV
-
-1. Download `TailVega-<version>-armv7.vpkg` and its checksum from the [latest release](https://github.com/looizao/tailscale-vegaos/releases/latest).
-2. Install Vega SDK `0.22.5850` on a supported Linux development machine.
-3. Enable Developer Mode on the Fire TV Stick and connect it over USB.
-4. Verify and install the package:
-
-   ```bash
-   sha256sum -c TailVega-<version>-armv7.vpkg.sha256
+   ```sh
    vega device list
-   vega device install-app --packagePath TailVega-<version>-armv7.vpkg
-   vega device launch-app --appName com.looizao.tailvega.main
+   vega device -d DEVICE_SERIAL install-app --packagePath JellyVega-0.1.0-armv7.vpkg
+   vega device -d DEVICE_SERIAL launch-app --appName com.looizao.jellyvega.main
    ```
 
-5. In the Tailscale admin console, create a one-off auth key with the shortest practical expiry. Select **Pre-approved** only if your tailnet uses device approval. Do not make the key ephemeral, because TailVega persists its node identity.
-6. Open TailVega, enter the key, and select **Connect**. The key is cleared from the UI and native input buffer after configuration.
+4. Enter your **server root**, for example `http://nas:8096`, `http://100.101.102.103:8096`, or `https://nas.example.ts.net`. A configured base path such as `/jellyfin` is supported. Omit `/web` and login tokens.
+5. Select **Connect to tailnet**, open the displayed login URL on your phone/computer, and approve the TV in your home tailnet. Alternatively, enter a one-off Tailscale auth key. Select **Open Jellyfin**, then sign in to Jellyfin normally.
 
-See the [complete setup and installation guide](docs/INSTALL.md), including Developer Mode activation and troubleshooting.
+The server must be a Tailscale device accessible to this TV through your tailnet policy. Names resolve from the authenticated Tailscale network map. LAN IPs, subnet-router-only servers, public URLs, and external media redirects are outside this preview's supported configuration.
 
-## Build from source
+Use the directional pad and Select in Jellyfin. Back returns through Jellyfin's screens. Menu (☰) returns to connection settings. Home exits to the launcher. Enrollment identity and sign-in persist across launches; disconnecting preserves identity.
 
-Prerequisites are Node.js 20, npm, Go 1.25.5, a C/C++ toolchain, and Vega SDK `0.22.5850`. The SDK's supported host is Ubuntu 22.04.
+## Build and test
 
-```bash
-git clone --recurse-submodules https://github.com/looizao/tailscale-vegaos.git
-cd tailscale-vegaos
+Pinned toolchain: Vega SDK **0.22.5850**, Node **22.22.0**, Go **1.26.8**, React Native **0.72**, WebView **3.3.1769932800**, Tailscale **1.102.4**.
+
+```sh
 npm ci --ignore-scripts
-npm run verify
+npm run verify             # TypeScript, Jest, Go race/integration tests, C ABI
+npm run audit:go           # Reachable Go vulnerability analysis
+node scripts/audit-npm.mjs # Checks documented upstream SDK exceptions
+npx playwright install chromium
+npm run test:browser       # Docker Jellyfin + two real tsnet nodes + Chromium
 source "$HOME/vega/env"
 npm run build:release
+bash scripts/stage-release.sh
 ```
 
-The package is written under `build/armv7-release/`. The native host smoke test validates the C ABI and engine lifecycle, while GitHub Actions performs the authoritative Vega ARMv7 package build and validation.
+The browser test creates a disposable Jellyfin 12 server and synthetic H.264/AAC movie; it needs Docker and free local ports 18096 and 18765. No real credentials are used. See [TESTING.md](docs/TESTING.md).
 
-## Architecture
+On Linux, use the included Ubuntu builder when the host is not supported by Amazon:
 
-```text
-Vega React Native TV UI
-          |
-          v
-Kepler Turbo Module (C++)
-          |
-          v
-libtailscale C ABI -> tsnet userspace engine -> tailnet
+```sh
+docker build -f tooling/Dockerfile -t jellyvega-builder:0.22.5850 .
+docker run --rm -v "$PWD:/work" jellyvega-builder:0.22.5850
 ```
 
-Read [Architecture](docs/ARCHITECTURE.md) for the trust boundaries and platform limitations.
+The container writes build outputs as root. A native SDK build on Ubuntu 22.04 avoids this ownership difference. Packages appear in `build/armv7-release/`; staged artifacts in `dist/`.
 
-## Security
+## CI and releases
 
-Treat the release `.vpkg` like any other network client. Verify its SHA-256 file, use a one-off key, restrict the node with Tailscale grants or ACLs, and revoke unexpected nodes in the admin console. See [SECURITY.md](SECURITY.md) for the threat model and reporting process.
+Every pull request and main push runs source checks, race tests, real local-tailnet tests, native C ABI tests, vulnerability checks, and real Jellyfin browser playback. CI then builds and validates the ARMv7 VPKG. Version tags run the same checks before publishing a preview release with SHA-256 checksums, package metadata, dependency inventory/SBOM, and third-party licenses. Failed checks prevent publication.
 
-## Status and support
+Read [ARCHITECTURE.md](docs/ARCHITECTURE.md), [SECURITY.md](SECURITY.md), and [CONTRIBUTING.md](CONTRIBUTING.md). The pinned Amazon/React Native dependency tree has documented upstream advisories; these are explicit exceptions, not repaired dependencies.
 
-This is an independent, community-maintained port. It is not affiliated with or supported by Tailscale Inc., Amazon.com, Inc., or their affiliates. Tailscale is a registered trademark of Tailscale Inc.; Amazon, Fire TV, and Vega are trademarks of their respective owners.
+## Credits and license
 
-Physical-device validation requires a Developer Mode enabled Fire TV Stick HD (2nd Generation). Please include the Vega OS build, TailVega release, and relevant device logs when filing an issue.
+Based on [looizao/tailscale-vegaos](https://github.com/looizao/tailscale-vegaos), with a new `tsnet` gateway and Jellyfin integration. Original code is MIT licensed. Tailscale is BSD-3-Clause; Amazon packages retain their license terms. Jellyfin Web is provided by your own server and retains its upstream license. Notices are included inside each VPKG and as a release artifact.
 
-## License
-
-TailVega's original code is licensed under the [MIT License](LICENSE). The `libtailscale` submodule and its transitive dependencies retain their own licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Independent community project, unaffiliated with Amazon, Jellyfin, or Tailscale. Platform references: [Amazon WebView](https://developer.amazon.com/docs/vega/0.22/overview-of-webview), [Developer Mode](https://developer.amazon.com/docs/vega/0.24/developer-mode), [Tailscale tsnet](https://tailscale.com/docs/features/tsnet).

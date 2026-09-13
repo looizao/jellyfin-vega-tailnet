@@ -1,99 +1,97 @@
 name: CI
-
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
-
+  workflow_call:
 permissions:
   contents: read
-
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   quality:
-    name: Quality and native smoke test
+    name: Quality, C ABI, and real tailnet tests
     runs-on: ubuntu-22.04
+    timeout-minutes: 20
     steps:
-      - name: Check out source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          submodules: recursive
-
-      - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
-        with:
-          node-version: 20
+          node-version: 22.22.0
           cache: npm
-
-      - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: 1.25.5
-          cache-dependency-path: third_party/libtailscale/go.sum
-
-      - name: Install JavaScript dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Run checks
-        run: npm run verify
-
+          go-version: 1.26.8
+          cache-dependency-path: native/go.sum
+      - run: npm ci --ignore-scripts
+      - run: python3 scripts/check-metadata.py
+      - name: Format, type, unit, race, integration, and native checks
+        run: |
+          test -z "$(gofmt -l native)"
+          npm run verify
+      - name: Native vulnerability analysis
+        run: npm run audit:go
+      - name: Check npm advisories against documented SDK exceptions
+        run: node scripts/audit-npm.mjs
+  browser:
+    name: Jellyfin 12 TV login and video over a real tailnet
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22.22.0
+          cache: npm
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.26.8
+          cache-dependency-path: native/go.sum
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: browser-evidence-${{ github.sha }}
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
   vpkg:
-    name: Build ARMv7 VPKG
+    name: Build and validate ARMv7 VPKG
     runs-on: ubuntu-22.04
     timeout-minutes: 45
-    needs: quality
+    needs: [quality, browser]
     steps:
-      - name: Check out source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          submodules: recursive
-
-      - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
-        with:
-          node-version: 20
+          node-version: 22.22.0
           cache: npm
-
-      - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: 1.25.5
-          cache-dependency-path: third_party/libtailscale/go.sum
-
-      - name: Install build prerequisites
-        run: sudo apt-get update && sudo apt-get install -y curl jq lz4 python3-dev
-
-      - name: Install pinned Vega SDK
+          go-version: 1.26.8
+          cache-dependency-path: native/go.sum
+      - name: Install build prerequisites and pinned SDK
         run: |
+          sudo apt-get update
+          sudo apt-get install -y curl jq lz4 python3-dev
           bash scripts/install-vega-sdk.sh
           echo "$HOME/vega/bin" >> "$GITHUB_PATH"
-
-      - name: Install JavaScript dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Build release package
+      - run: npm ci --ignore-scripts
+      - name: Build and stage validated release artifacts
         env:
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           source "$HOME/vega/env"
           npm run build:release
-
-      - name: Validate package
-        run: |
-          source "$HOME/vega/env"
-          vpkg="$(find build/armv7-release -name '*.vpkg' -type f -print -quit)"
-          test -n "$vpkg"
-          vega exec vpt validate "$vpkg"
-          vega exec vpt info "$vpkg" --json
-
-      - name: Upload ARMv7 package
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+          bash scripts/stage-release.sh
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: tailvega-armv7-${{ github.sha }}
-          path: build/armv7-release/*.vpkg
+          name: jellyvega-armv7-${{ github.sha }}
+          path: dist/*
           if-no-files-found: error
           retention-days: 14

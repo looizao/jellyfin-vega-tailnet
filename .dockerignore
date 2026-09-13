@@ -1,0 +1,7 @@
+*
+!scripts
+scripts/*
+!scripts/install-vega-sdk.sh
+!tooling
+tooling/*
+!tooling/Dockerfile

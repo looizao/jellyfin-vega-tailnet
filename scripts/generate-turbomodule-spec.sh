@@ -11,7 +11,7 @@ npx keplerscript-turbomodule-api codegen \
   src/native/NativeTailscale.ts \
   --new \
   -o "$temporary_dir" \
-  --namespace tailvega \
+  --namespace jellyvega \
   --className Tailscale \
   --outFile Tailscale
 
@@ -32,4 +32,4 @@ fi
 cp "$temporary_dir/generated/TailscaleSpec.cpp" "$generated_dir/TailscaleSpec.cpp"
 cp "$temporary_dir/generated/TailscaleSpec.h" "$generated_dir/TailscaleSpec.h"
 
-echo "Regenerated the TailVega Turbo Module specification."
+echo "Regenerated the JellyVega Turbo Module specification."

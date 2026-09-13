@@ -1,37 +1,47 @@
 {
-  "name": "tailvega",
+  "name": "jellyvega",
   "version": "0.1.0",
   "private": true,
-  "description": "Experimental userspace Tailscale client for Amazon Vega OS Fire TV devices",
+  "description": "Jellyfin over an embedded Tailscale tailnet connection for Vega OS Fire TV",
   "license": "MIT",
   "scripts": {
     "start": "react-native start",
-    "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
+    "lint": "eslint src --ext .js,.jsx,.ts,.tsx --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "jest --colors --runInBand",
     "codegen": "bash scripts/generate-turbomodule-spec.sh",
     "codegen:check": "bash scripts/generate-turbomodule-spec.sh --check",
-    "build:native-host": "bash scripts/build-libtailscale.sh host",
-    "test:native-host": "bash scripts/test-libtailscale-host.sh",
+    "build:native-host": "bash scripts/build-native.sh",
+    "test:native-host": "bash scripts/test-native-host.sh",
     "build:release": "bash scripts/build-vega.sh Release",
     "build:debug": "bash scripts/build-vega.sh Debug",
     "build:app": "npm run build:release",
-    "verify": "npm-run-all lint typecheck test codegen:check build:native-host test:native-host"
+    "verify": "npm-run-all lint typecheck test codegen:check vet:go test:go test:integration build:native-host test:native-host",
+    "test:go": "cd native && go test -race -count=1 ./...",
+    "test:integration": "cd native && go test -race -tags=integration -count=1 ./engine",
+    "vet:go": "cd native && go vet ./...",
+    "test:browser": "bash scripts/test-browser.sh",
+    "audit:go": "cd native && go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...",
+    "licenses": "python3 scripts/collect-licenses.py"
   },
   "dependencies": {
     "@amazon-devices/keplerscript-turbomodule-api": "1.2.5",
     "@amazon-devices/react-native-kepler": "2.1.0",
+    "@amazon-devices/webview": "3.3.1769932800",
     "@babel/runtime": "7.28.4",
+    "qrcode-generator": "2.0.4",
     "react": "18.2.0",
     "react-native": "0.72.0"
   },
   "devDependencies": {
     "@amazon-devices/kepler-cli-platform": "0.22.12",
+    "@playwright/test": "1.63.0",
     "@react-native-community/cli": "11.3.2",
     "@react-native/eslint-config": "0.72.2",
     "@react-native/metro-config": "0.72.12",
     "@tsconfig/react-native": "3.0.5",
     "@types/jest": "29.5.14",
+    "@types/node": "22.20.2",
     "@types/react": "18.3.24",
     "@types/react-test-renderer": "18.3.1",
     "eslint": "8.57.1",
@@ -44,11 +54,11 @@
     "typescript": "5.4.5"
   },
   "engines": {
-    "node": ">=18 <23"
+    "node": ">=22 <23"
   },
   "kepler": {
     "projectType": "application",
-    "appName": "TailVega",
+    "appName": "JellyVega",
     "targets": [
       "tv"
     ],

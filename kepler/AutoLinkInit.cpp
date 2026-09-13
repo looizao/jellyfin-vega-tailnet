@@ -5,6 +5,6 @@
 extern "C" {
 __attribute__((visibility("default"))) void
 autoLinkVegaTurboModulesV1() noexcept {
-  KEPLER_REGISTER_TURBO_MODULE(tailvega, Tailscale);
+  KEPLER_REGISTER_TURBO_MODULE(jellyvega, Tailscale);
 }
 }
