@@ -27,7 +27,7 @@
   "dependencies": {
     "@amazon-devices/keplerscript-turbomodule-api": "1.2.5",
     "@amazon-devices/react-native-kepler": "2.1.0",
-    "@amazon-devices/webview": "3.3.1769932800",
+    "@amazon-devices/webview": "3.5.11",
     "@babel/runtime": "7.28.4",
     "qrcode-generator": "2.0.4",
     "react": "18.2.0",
