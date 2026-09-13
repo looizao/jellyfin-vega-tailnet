@@ -1,6 +1,6 @@
 FROM node:22.22.0-bookworm-slim AS node
 FROM golang:1.26.8-bookworm AS go
-FROM ubuntu:22.04
+FROM ubuntu:26.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git jq lz4 python3 python3-dev build-essential unzip zip file binutils && rm -rf /var/lib/apt/lists/*
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
