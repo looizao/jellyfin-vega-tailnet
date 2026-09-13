@@ -2,7 +2,7 @@ schema-version = 1
 
 [package]
 title = "JellyVega"
-version = "0.1.0"
+version = "0.1.1"
 id = "com.looizao.jellyvega"
 icon = "@image/tailvega-icon.png"
 

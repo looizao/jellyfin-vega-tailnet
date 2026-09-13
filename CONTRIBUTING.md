@@ -8,6 +8,6 @@ When changing a dependency with an audit exception, review and update SECURITY.m
 
 ## Release
 
-Update the package/lockfile, manifest, CMake project version, native display version, and release notes together. Commit and push the verified source. Create a version tag matching package.json, for example `git tag -a v0.1.0 -m 'JellyVega 0.1.0 preview'`, then push that specific tag. The Release workflow rebuilds and tests the tag, downloads its own validated artifacts, verifies their checksums, and publishes a GitHub prerelease. No signing secrets are required for a development package.
+Update the package/lockfile, manifest, CMake project version, native display version, and release notes together. Commit and push the verified source. Create a version tag matching package.json, for example `git tag -a v0.1.1 -m 'JellyVega 0.1.1 preview'`, then push that specific tag. The Release workflow rebuilds and tests the tag, downloads its own validated artifacts, verifies their checksums, and publishes a GitHub prerelease. No signing secrets are required for a development package.
 
 Use Amazon-issued signing credentials only for the applicable Amazon publication/developer-signing workflow. Public release automation never stores personal tailnet credentials.

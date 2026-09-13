@@ -51,6 +51,10 @@ test('sets TV layout, preserves sign-in on relaunch, and clears it when servers 
   const letter = {...event, key: 'r', target: {tagName: 'INPUT'}};
   addEventListener.mock.calls[0][1](letter);
   expect(postMessage).not.toHaveBeenCalled();
-  addEventListener.mock.calls[0][1]({...letter, key: 'ContextMenu', keyCode: 93});
+  addEventListener.mock.calls[0][1]({
+    ...letter,
+    key: 'ContextMenu',
+    keyCode: 93,
+  });
   expect(postMessage).toHaveBeenCalledWith('jellyvega.settings');
 });

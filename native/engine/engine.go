@@ -21,7 +21,7 @@ import (
 	"tailscale.com/types/logger"
 )
 
-const Version = "JellyVega 0.1.0 / Tailscale 1.102.4"
+const Version = "JellyVega 0.1.1 / Tailscale 1.102.4"
 
 type Config struct {
 	ServerURL string `json:"serverUrl"`

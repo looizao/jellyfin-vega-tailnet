@@ -33,8 +33,8 @@ Amazon controls developer access and package-signing requirements. A successful 
 Download the ARMv7 VPKG and SHA256SUMS from this repository's Releases page. Verify the VPKG's entry using `sha256sum` (or download all listed assets and run `sha256sum -c SHA256SUMS`). Then:
 
 ```sh
-vega exec vpt validate JellyVega-0.1.0-armv7.vpkg
-vega device -d DEVICE_SERIAL install-app --packagePath JellyVega-0.1.0-armv7.vpkg
+vega exec vpt validate JellyVega-0.1.1-armv7.vpkg
+vega device -d DEVICE_SERIAL install-app --packagePath JellyVega-0.1.1-armv7.vpkg
 vega device -d DEVICE_SERIAL launch-app --appName com.looizao.jellyvega.main
 ```
 

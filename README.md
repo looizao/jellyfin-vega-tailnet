@@ -19,7 +19,7 @@ JellyVega embeds Tailscale's official `tsnet` engine and opens your server's mat
 
    ```sh
    vega device list
-   vega device -d DEVICE_SERIAL install-app --packagePath JellyVega-0.1.0-armv7.vpkg
+   vega device -d DEVICE_SERIAL install-app --packagePath JellyVega-0.1.1-armv7.vpkg
    vega device -d DEVICE_SERIAL launch-app --appName com.looizao.jellyvega.main
    ```
 

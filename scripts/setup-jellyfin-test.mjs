@@ -5,7 +5,7 @@ const base = 'http://127.0.0.1:18096';
 const password = randomBytes(24).toString('hex');
 const username = 'jellyvega-test';
 const auth =
-  'MediaBrowser Client="JellyVega tests", Device="Chromium", DeviceId="jellyvega-ci", Version="0.1.0"';
+  'MediaBrowser Client="JellyVega tests", Device="Chromium", DeviceId="jellyvega-ci", Version="0.1.1"';
 let token;
 async function api(path, body, method = 'POST') {
   let r;
