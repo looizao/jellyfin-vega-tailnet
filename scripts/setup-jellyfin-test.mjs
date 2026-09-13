@@ -14,6 +14,7 @@ async function api(path, body, method = 'POST') {
       method,
       headers: {
         'Content-Type': 'application/json',
+        Connection: 'close',
         Authorization: auth + (token ? `, Token="${token}"` : ''),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -29,7 +30,12 @@ async function api(path, body, method = 'POST') {
 }
 for (let n = 0; n < 90; n++) {
   try {
-    if ((await fetch(base + '/health')).ok) break;
+    const readiness = await fetch(base + '/Startup/Configuration', {
+      headers: {Connection: 'close'},
+      signal: AbortSignal.timeout(5000),
+    });
+    await readiness.body.cancel();
+    if (readiness.ok) break;
   } catch {}
   if (n === 89) throw new Error('Jellyfin did not start');
   await new Promise(r => setTimeout(r, 1000));
